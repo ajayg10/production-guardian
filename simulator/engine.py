@@ -151,8 +151,9 @@ class SimulatorEngine:
         """
         Calculate how far into the incident we are (0.0 → 1.0).
 
-        The degradation is progressive over ~5 minutes to allow the demo to
-        show gradual deterioration.
+        For live demonstrations and Grafana Cloud observability, starts immediately
+        at 0.75 (75% degradation) and reaches peak over 30 seconds so telemetry
+        anomalies are immediately visible in Grafana Cloud and the UI.
         """
         if (
             self._state != SimulatorState.INCIDENT_ACTIVE
@@ -161,14 +162,13 @@ class SimulatorEngine:
             return 0.0
 
         elapsed = time.time() - self._scenario_start_time
-        # Full degradation reached after 5 minutes (300 seconds)
-        return min(elapsed / 300.0, 1.0)
+        return min(0.75 + (elapsed / 30.0) * 0.25, 1.0)
 
     def _calculate_remediation_progress(self) -> float:
         """
         Calculate remediation recovery progress (0.0 → 1.0).
 
-        Recovery happens over ~2 minutes.
+        Recovers to target baseline over 15 seconds.
         """
         if (
             self._state != SimulatorState.REMEDIATING
@@ -177,7 +177,7 @@ class SimulatorEngine:
             return 0.0 if self._state != SimulatorState.RECOVERED else 1.0
 
         elapsed = time.time() - self._remediation_start_time
-        return min(elapsed / 120.0, 1.0)
+        return min(elapsed / 15.0, 1.0)
 
     def get_status(self) -> dict[str, Any]:
         """Get current simulator status for API response."""

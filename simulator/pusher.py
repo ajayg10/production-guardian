@@ -141,13 +141,14 @@ def push_metrics_to_grafana(metrics: dict[str, float]) -> bool:
         timestamp_ms = int(time.time() * 1000)
         samples = _build_prometheus_samples(metrics, timestamp_ms)
 
+        headers = {
+            "Content-Type": "application/x-protobuf",
+            "Content-Encoding": "snappy",
+            "X-Prometheus-Remote-Write-Version": "0.1.0",
+        }
         response = requests.post(
             url=remote_write_url,
-            content_type="application/x-protobuf",
-            headers={
-                "Content-Encoding": "snappy",
-                "X-Prometheus-Remote-Write-Version": "0.1.0",
-            },
+            headers=headers,
             data=samples,
             auth=(user_id, api_key),
             timeout=10,

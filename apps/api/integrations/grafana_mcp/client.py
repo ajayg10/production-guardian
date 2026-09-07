@@ -60,6 +60,34 @@ class GrafanaMCPClient:
             await self._client.aclose()
             self._client = None
 
+    async def _send_mcp_request(self, payload: dict[str, Any]) -> httpx.Response:
+        """Send MCP request with automatic fallback to built-in server on port 8000."""
+        client = await self._get_client()
+        if "8080" in self._mcp_url:
+            raw_candidates = ["http://127.0.0.1:8000", "http://localhost:8000", "http://api:8000", self._mcp_url]
+        else:
+            raw_candidates = [self._mcp_url, "http://127.0.0.1:8000", "http://localhost:8000", "http://api:8000"]
+
+        candidates = []
+        for c in raw_candidates:
+            if c not in candidates:
+                candidates.append(c)
+
+        last_err = None
+        for base_url in candidates:
+            try:
+                url = f"{base_url.rstrip('/')}/mcp"
+                response = await client.post(url, json=payload)
+                if response.status_code in (200, 400, 500):
+                    self._mcp_url = base_url
+                    return response
+            except (httpx.ConnectError, httpx.TimeoutException) as e:
+                last_err = e
+                continue
+        if last_err:
+            raise last_err
+        raise httpx.ConnectError("Could not connect to any MCP endpoint")
+
     async def check_health(self) -> dict[str, Any]:
         """
         Check if the Grafana MCP server is available.
@@ -67,24 +95,20 @@ class GrafanaMCPClient:
         Returns a status dict with 'available' bool and optional error message.
         """
         try:
-            client = await self._get_client()
             # Try to initialize an MCP session
-            response = await client.post(
-                f"{self._mcp_url}/mcp",
-                json={
-                    "jsonrpc": "2.0",
-                    "id": 1,
-                    "method": "initialize",
-                    "params": {
-                        "protocolVersion": "2024-11-05",
-                        "capabilities": {},
-                        "clientInfo": {
-                            "name": "production-guardian",
-                            "version": "1.0.0",
-                        },
+            response = await self._send_mcp_request({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {},
+                    "clientInfo": {
+                        "name": "production-guardian",
+                        "version": "1.0.0",
                     },
                 },
-            )
+            })
 
             if response.status_code == 200:
                 self._available = True
@@ -126,7 +150,6 @@ class GrafanaMCPClient:
         Raises GrafanaMCPError on tool call errors.
         """
         start_time = time.monotonic()
-        client = await self._get_client()
 
         payload = {
             "jsonrpc": "2.0",
@@ -145,7 +168,7 @@ class GrafanaMCPClient:
         )
 
         try:
-            response = await client.post(f"{self._mcp_url}/mcp", json=payload)
+            response = await self._send_mcp_request(payload)
             duration_ms = int((time.monotonic() - start_time) * 1000)
 
             if response.status_code == 404:
@@ -285,16 +308,12 @@ class GrafanaMCPClient:
     async def list_tools(self) -> list[dict[str, Any]]:
         """List all available MCP tools from the server."""
         try:
-            client = await self._get_client()
-            response = await client.post(
-                f"{self._mcp_url}/mcp",
-                json={
-                    "jsonrpc": "2.0",
-                    "id": 1,
-                    "method": "tools/list",
-                    "params": {},
-                },
-            )
+            response = await self._send_mcp_request({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/list",
+                "params": {},
+            })
             response.raise_for_status()
             result = response.json()
             return result.get("result", {}).get("tools", [])

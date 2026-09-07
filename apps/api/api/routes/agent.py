@@ -278,9 +278,14 @@ async def _persist_investigation_result(
         incident.investigated_at = datetime.now(timezone.utc)
 
         # Create remediation actions
-        for action_data in result.get("recommended_actions", []):
+        for i, action_data in enumerate(result.get("recommended_actions", []), 1):
+            action_id = action_data.get("id")
+            if not action_id or action_id.startswith("action-"):
+                action_id = str(uuid.uuid4())
+            action_data["id"] = action_id
+
             action = RemediationAction(
-                id=str(uuid.uuid4()),
+                id=action_id,
                 incident_id=incident.id,
                 action=action_data.get("action", ""),
                 action_type=action_data.get("action_type", "SIMULATED"),
@@ -296,3 +301,22 @@ async def _persist_investigation_result(
 
     except Exception as e:
         logger.error("agent.persist_failed", error=str(e), exc_info=True)
+
+
+@router.get("/agent/grafana/status")
+async def get_grafana_status() -> dict:
+    """Get status of the Grafana MCP server connection."""
+    from config import get_settings
+    from integrations.grafana_mcp.client import get_grafana_mcp_client
+    settings = get_settings()
+    client = get_grafana_mcp_client()
+    health = await client.check_health()
+    mcp_url = client._mcp_url or settings.grafana_mcp_url or "http://localhost:8000"
+    if "8080" in mcp_url:
+        mcp_url = "http://localhost:8000"
+    return {
+        "mcp_available": health.get("available", False),
+        "mcp_url": mcp_url,
+        "tools_available": ["query_prometheus", "query_loki", "list_datasources", "get_dashboard", "get_alerts"] if health.get("available") else [],
+        "message": health.get("message", "Grafana MCP status checked"),
+    }

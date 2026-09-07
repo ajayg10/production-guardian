@@ -2,6 +2,7 @@
 import uuid
 from datetime import datetime, timezone
 
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,6 +18,7 @@ from schemas.incident import (
 )
 from simulator.engine import get_simulator
 
+logger = structlog.get_logger(__name__)
 router = APIRouter()
 
 
@@ -122,6 +124,13 @@ async def simulate_incident(
     await db.commit()
     await db.refresh(incident)
 
+    # Immediately push degraded incident telemetry to Grafana Cloud
+    from simulator.pusher import push_metrics_to_grafana
+    try:
+        push_metrics_to_grafana(sim.get_current_metrics())
+    except Exception as ex:
+        logger.warning("incidents.push_failed", error=str(ex))
+
     return SimulateIncidentResponse(
         incident_id=incident.id,
         scenario=request.scenario.value,
@@ -146,6 +155,13 @@ async def reset_demo(db: AsyncSession = Depends(get_db)) -> ResetResponse:
     sim = get_simulator()
     sim.reset()
 
+    # Immediately push clean baseline telemetry to Grafana Cloud
+    from simulator.pusher import push_metrics_to_grafana
+    try:
+        push_metrics_to_grafana(sim.get_current_metrics())
+    except Exception as ex:
+        logger.warning("incidents.reset_push_failed", error=str(ex))
+
     reset_items = ["simulator_state", "telemetry_scenario"]
 
     # Close all active incidents
@@ -168,6 +184,8 @@ async def reset_demo(db: AsyncSession = Depends(get_db)) -> ResetResponse:
         reset_items.append(f"incidents_closed ({len(incidents)})")
 
     await db.commit()
+
+    logger.info("demo.reset_complete", closed_incidents=len(incidents))
 
     return ResetResponse(
         message="Demo reset complete. System is back to normal baseline.",

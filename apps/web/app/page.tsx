@@ -21,11 +21,13 @@ import { Progress } from "@/components/ui/progress"
 import { getProductionOverview } from "@/lib/api"
 
 export default function OverviewPage() {
+  const [mounted, setMounted] = useState(false)
   const [overview, setOverview] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
 
   useEffect(() => {
+    setMounted(true)
     async function fetchData() {
       try {
         const data = await getProductionOverview()
@@ -41,7 +43,7 @@ export default function OverviewPage() {
     return () => clearInterval(interval)
   }, [])
 
-  if (loading && !overview) {
+  if (!mounted || (loading && !overview)) {
     return <div className="flex h-[50vh] items-center justify-center">Loading production data...</div>
   }
 
@@ -67,7 +69,7 @@ export default function OverviewPage() {
   ]
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-8 animate-in fade-in duration-500" suppressHydrationWarning>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{production.display_name}</h1>

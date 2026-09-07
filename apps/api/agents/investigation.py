@@ -141,9 +141,9 @@ class InvestigationAgent:
         """
         Run investigation, yielding operational events for streaming.
         """
-        def event(message: str, tool_name: str | None = None, success: bool = True, data: dict | None = None) -> dict:
+        def event(message: str, tool_name: str | None = None, success: bool = True, data: dict | None = None, event_type: str | None = None) -> dict:
             return {
-                "event_type": "TOOL_CALL" if tool_name else "STEP",
+                "event_type": event_type if event_type else ("TOOL_CALL" if tool_name else "STEP"),
                 "message": message,
                 "tool_name": tool_name,
                 "success": success,

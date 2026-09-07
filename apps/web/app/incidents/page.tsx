@@ -10,10 +10,12 @@ import { Button } from "@/components/ui/button"
 import { getIncidents } from "@/lib/api"
 
 export default function IncidentsPage() {
+  const [mounted, setMounted] = useState(false)
   const [incidents, setIncidents] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    setMounted(true)
     async function fetchIncidents() {
       try {
         const data = await getIncidents()
@@ -49,12 +51,12 @@ export default function IncidentsPage() {
     }
   }
 
-  if (loading && incidents.length === 0) {
-    return <div className="flex h-[50vh] items-center justify-center">Loading incidents...</div>
+  if (!mounted || (loading && incidents.length === 0)) {
+    return <div className="flex h-[50vh] items-center justify-center" suppressHydrationWarning>Loading incidents...</div>
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-8 animate-in fade-in duration-500" suppressHydrationWarning>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Incidents</h1>

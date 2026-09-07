@@ -19,10 +19,13 @@ import models.database  # noqa: F401, E402 — import to register models
 # Alembic Config object
 config = context.config
 
+from dotenv import load_dotenv
+load_dotenv()
+
 # Override sqlalchemy.url from environment variable
 database_sync_url = os.environ.get(
     "DATABASE_SYNC_URL",
-    "postgresql://guardian:guardian@localhost:5432/production_guardian",
+    "postgresql://guardian:guardian@127.0.0.1:5432/production_guardian",
 )
 config.set_main_option("sqlalchemy.url", database_sync_url)
 

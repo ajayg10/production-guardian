@@ -26,8 +26,13 @@ export default function InvestigatePage() {
   const router = useRouter()
   const incidentId = params.id as string
   
+  const [mounted, setMounted] = useState(false)
   const [incident, setIncident] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
   
   // Agent streaming state
   const [events, setEvents] = useState<any[]>([])
@@ -172,19 +177,19 @@ export default function InvestigatePage() {
     }
   }
 
-  if (loading) {
-    return <div className="flex h-[50vh] items-center justify-center">Loading incident...</div>
+  if (!mounted || loading) {
+    return <div className="flex h-[50vh] items-center justify-center" suppressHydrationWarning>Loading incident...</div>
   }
 
   if (!incident) {
-    return <div className="flex h-[50vh] items-center justify-center">Incident not found</div>
+    return <div className="flex h-[50vh] items-center justify-center" suppressHydrationWarning>Incident not found</div>
   }
 
   const isResolved = incident.status === 'RESOLVED' || incident.status === 'CLOSED'
   const hasResult = !!investigationResult
 
   return (
-    <div className="space-y-8 pb-12 animate-in fade-in duration-500">
+    <div className="space-y-8 pb-12 animate-in fade-in duration-500" suppressHydrationWarning>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-6">
         <div>
           <div className="flex items-center space-x-2 mb-2">

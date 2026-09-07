@@ -55,6 +55,20 @@ async def approve_remediation(
     )
     action = result.scalar_one_or_none()
 
+    if not action and (request.remediation_id.startswith("action-") or request.remediation_id.isdigit()):
+        idx = 0
+        try:
+            idx = int(request.remediation_id.replace("action-", "")) - 1
+        except ValueError:
+            pass
+        all_actions = (await db.execute(
+            select(RemediationAction).where(RemediationAction.status == RemediationStatus.PENDING).order_by(RemediationAction.created_at)
+        )).scalars().all()
+        if 0 <= idx < len(all_actions):
+            action = all_actions[idx]
+        elif all_actions:
+            action = all_actions[0]
+
     if not action:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -131,6 +145,24 @@ async def simulate_remediation(
     )
     action = result.scalar_one_or_none()
 
+    if not action and (request.remediation_id.startswith("action-") or request.remediation_id.isdigit()):
+        idx = 0
+        try:
+            idx = int(request.remediation_id.replace("action-", "")) - 1
+        except ValueError:
+            pass
+        all_actions = (await db.execute(
+            select(RemediationAction).where(RemediationAction.status == RemediationStatus.APPROVED).order_by(RemediationAction.created_at)
+        )).scalars().all()
+        if not all_actions:
+            all_actions = (await db.execute(
+                select(RemediationAction).order_by(RemediationAction.created_at)
+            )).scalars().all()
+        if 0 <= idx < len(all_actions):
+            action = all_actions[idx]
+        elif all_actions:
+            action = all_actions[0]
+
     if not action:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -164,6 +196,13 @@ async def simulate_remediation(
 
     # Get post-remediation metrics
     recovered_metrics = sim.get_current_metrics()
+
+    # Immediately push recovered telemetry to Grafana Cloud
+    from simulator.pusher import push_metrics_to_grafana
+    try:
+        push_metrics_to_grafana(recovered_metrics)
+    except Exception as ex:
+        logger.warning("remediation.push_failed", error=str(ex))
 
     # Verify recovery
     verification = _verify_recovery(

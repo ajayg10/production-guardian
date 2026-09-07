@@ -36,10 +36,10 @@ class Settings(BaseSettings):
     # Database
     # ---------------------------------------------------------------------------
     database_url: str = Field(
-        default="postgresql+asyncpg://guardian:guardian@localhost:5432/production_guardian"
+        default="postgresql+asyncpg://guardian:guardian@127.0.0.1:5432/production_guardian"
     )
     database_sync_url: str = Field(
-        default="postgresql://guardian:guardian@localhost:5432/production_guardian"
+        default="postgresql://guardian:guardian@127.0.0.1:5432/production_guardian"
     )
 
     # ---------------------------------------------------------------------------
@@ -65,7 +65,7 @@ class Settings(BaseSettings):
     # ---------------------------------------------------------------------------
     # Grafana MCP
     # ---------------------------------------------------------------------------
-    grafana_mcp_url: str = "http://localhost:8080"
+    grafana_mcp_url: str = "http://localhost:8000"
     grafana_mcp_transport: Literal["http", "stdio"] = "http"
 
     # ---------------------------------------------------------------------------

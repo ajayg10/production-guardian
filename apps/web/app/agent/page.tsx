@@ -1,10 +1,17 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Terminal, Database, Network, Wrench } from "lucide-react"
 
 export default function AgentPage() {
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
   const agents = [
     {
       name: "Orchestrator Agent",
@@ -40,8 +47,12 @@ export default function AgentPage() {
     }
   ]
 
+  if (!mounted) {
+    return <div className="flex h-[50vh] items-center justify-center" suppressHydrationWarning>Loading Agent Hub...</div>
+  }
+
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-8 animate-in fade-in duration-500" suppressHydrationWarning>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Agent Hub</h1>
