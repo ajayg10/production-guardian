@@ -27,7 +27,22 @@ if hasattr(sys.stdout, "reconfigure"):
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy import select, delete
 
-from models.database import Production, Scene, ScenePriority, SceneStatus, ProductionStatus
+from datetime import datetime, timezone, timedelta
+
+from models.database import (
+    Production,
+    Scene,
+    ScenePriority,
+    SceneStatus,
+    ProductionStatus,
+    Incident,
+    IncidentSeverity,
+    IncidentStatus,
+    RemediationAction,
+    RemediationStatus,
+    AgentRun,
+    AgentRunStatus,
+)
 from core.database import Base
 
 
@@ -157,11 +172,157 @@ async def seed(db: AsyncSession) -> None:
         )
         db.add(scene)
 
-    await db.commit()
     print(f"  ✓ Created {len(scenes_data)} scenes (40-45)")
     print("  ✓ Scene 42 'Point of No Return' marked as CRITICAL, IN_PROGRESS")
-    print("  ✓ Scene 42: 680 GB footage, 22:00 editorial deadline")
-    print("  ✓ Scene 42 dependents: [43, 44]")
+
+    # -------------------------------------------------------------------------
+    # Seed Realistic Production Incidents
+    # -------------------------------------------------------------------------
+    now = datetime.now(timezone.utc)
+
+    # 1. Active critical incident on critical Scene 42
+    inc_active = Incident(
+        id=str(uuid.uuid4()),
+        production_id=production.id,
+        title="Storage Saturation on INGEST-01",
+        description="High disk utilization on primary ingest volume /mnt/fast-ingest causing write contention and throttling incoming Scene 42 raw camera packages.",
+        severity=IncidentSeverity.CRITICAL,
+        status=IncidentStatus.ACTIVE,
+        scenario_type="STORAGE_SATURATION",
+        root_cause="Storage saturation on INGEST-01. Disk utilization approaching 94% capacity threshold.",
+        confidence=0.94,
+        affected_systems=["INGEST-01", "NAS-01"],
+        affected_scene_numbers=[42, 43],
+        production_impact={
+            "current_ingest_rate_gbps": 0.68,
+            "required_ingest_rate_gbps": 1.85,
+            "projected_delay_minutes": 47.0,
+            "deadline_at_risk": True,
+            "downstream_risk": ["Scene 43 assembly blocked", "Daily delivery package at risk"],
+        },
+        estimated_delay_minutes=47.0,
+        deadline_at_risk=True,
+        started_at=now - timedelta(minutes=14),
+    )
+    db.add(inc_active)
+    await db.flush()
+
+    action_active = RemediationAction(
+        id=str(uuid.uuid4()),
+        incident_id=inc_active.id,
+        action="Free 180 GB from completed proxy files on INGEST-01",
+        action_type="SIMULATED",
+        risk_level="LOW",
+        expected_benefit="HIGH",
+        expected_recovery_minutes=15,
+        confidence=0.92,
+        status=RemediationStatus.PENDING,
+        details={"volume": "/mnt/fast-ingest", "target_gb": 180, "action": "purge_cache"},
+    )
+    db.add(action_active)
+
+    # 2. Resolved incident from earlier today (Network Degradation)
+    inc_network = Incident(
+        id=str(uuid.uuid4()),
+        production_id=production.id,
+        title="Network Degradation on NET-EDGE-07",
+        description="Packet loss and latency spike on edge 10GbE network link between Stage 7 DIT cart and central storage.",
+        severity=IncidentSeverity.HIGH,
+        status=IncidentStatus.RESOLVED,
+        scenario_type="NETWORK_DEGRADATION",
+        root_cause="Dirty fiber optic transceiver connector on NET-EDGE-07 causing 8.5% packet drop.",
+        confidence=0.96,
+        affected_systems=["NET-EDGE-07", "NET-CORE-01"],
+        affected_scene_numbers=[41],
+        production_impact={
+            "current_ingest_rate_gbps": 1.40,
+            "required_ingest_rate_gbps": 1.85,
+            "projected_delay_minutes": 15.0,
+            "deadline_at_risk": False,
+        },
+        estimated_delay_minutes=15.0,
+        deadline_at_risk=False,
+        started_at=now - timedelta(hours=3, minutes=25),
+        investigated_at=now - timedelta(hours=3, minutes=20),
+        resolved_at=now - timedelta(hours=3, minutes=5),
+    )
+    db.add(inc_network)
+    await db.flush()
+
+    action_network = RemediationAction(
+        id=str(uuid.uuid4()),
+        incident_id=inc_network.id,
+        action="Reroute upload traffic to redundant Stage 7 secondary fiber link",
+        action_type="SIMULATED",
+        risk_level="LOW",
+        expected_benefit="HIGH",
+        expected_recovery_minutes=10,
+        confidence=0.95,
+        status=RemediationStatus.COMPLETED,
+        details={"interface": "eth1_backup", "status": "active"},
+    )
+    db.add(action_network)
+
+    # 3. Resolved incident from yesterday (Camera Thermal Alert)
+    inc_camera = Incident(
+        id=str(uuid.uuid4()),
+        production_id=production.id,
+        title="Camera Overheat on CAM-03",
+        description="VFX soundstage heat lamps caused enclosure temperature on CAM-03 to reach 78°C, dropping recording frames.",
+        severity=IncidentSeverity.HIGH,
+        status=IncidentStatus.RESOLVED,
+        scenario_type="CAMERA_FAILURE",
+        root_cause="Cooling fan exhaust blocked by heavy matte box accessory on CAM-03 rig.",
+        confidence=0.91,
+        affected_systems=["CAM-03"],
+        affected_scene_numbers=[40],
+        estimated_delay_minutes=12.0,
+        deadline_at_risk=False,
+        started_at=now - timedelta(days=1, hours=2),
+        investigated_at=now - timedelta(days=1, hours=1, minutes=50),
+        resolved_at=now - timedelta(days=1, hours=1, minutes=30),
+    )
+    db.add(inc_camera)
+    await db.flush()
+
+    action_camera = RemediationAction(
+        id=str(uuid.uuid4()),
+        incident_id=inc_camera.id,
+        action="Reposition auxiliary soundstage cooling fan toward CAM-03 cage",
+        action_type="SIMULATED",
+        risk_level="LOW",
+        expected_benefit="HIGH",
+        expected_recovery_minutes=8,
+        confidence=0.90,
+        status=RemediationStatus.COMPLETED,
+        details={"camera": "CAM-03", "temp_before": 78.0, "temp_after": 42.0},
+    )
+    db.add(action_camera)
+
+    # 4. Closed incident from Day 45 (Render Queue Contention)
+    inc_render = Incident(
+        id=str(uuid.uuid4()),
+        production_id=production.id,
+        title="Render Bottleneck on EDIT-01",
+        description="Concurrent 8K ProRes timeline export jobs saturated all 4 GPUs on EDIT-01 workstation.",
+        severity=IncidentSeverity.MEDIUM,
+        status=IncidentStatus.CLOSED,
+        scenario_type="RENDER_BOTTLENECK",
+        root_cause="GPU VRAM exhaustion from unbatched ProRes timeline rendering jobs.",
+        confidence=0.88,
+        affected_systems=["EDIT-01"],
+        affected_scene_numbers=[40],
+        estimated_delay_minutes=0.0,
+        deadline_at_risk=False,
+        started_at=now - timedelta(days=2, hours=4),
+        investigated_at=now - timedelta(days=2, hours=3, minutes=55),
+        resolved_at=now - timedelta(days=2, hours=3, minutes=20),
+    )
+    db.add(inc_render)
+
+    await db.commit()
+    print("  ✓ Created 4 production incidents (1 Active, 2 Resolved, 1 Closed)")
+    print("  ✓ Attached remediation history and production impact models")
     print("\n✅ Seed complete!")
     print("\nProduction context:")
     print(f"  Production: NIGHTFALL (Day {production.production_day})")
