@@ -28,7 +28,7 @@ async def list_incidents(
 ) -> list[IncidentSummarySchema]:
     """List all incidents for the current production."""
     result = await db.execute(
-        select(Incident).order_by(Incident.started_at.desc()).limit(20)
+        select(Incident).order_by(Incident.started_at.desc()).limit(100)
     )
     incidents = result.scalars().all()
     return [IncidentSummarySchema.model_validate(i) for i in incidents]
