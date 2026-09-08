@@ -41,7 +41,13 @@ async def seed(db: AsyncSession) -> None:
     """Seed all production data."""
     print("🎬 Seeding Production Guardian database...")
 
+    # Import child models to delete in foreign key dependency order
+    from models.database import Incident, RemediationAction, AgentRun
+
     # Clear existing data
+    await db.execute(delete(RemediationAction))
+    await db.execute(delete(AgentRun))
+    await db.execute(delete(Incident))
     await db.execute(delete(Scene))
     await db.execute(delete(Production))
     await db.commit()

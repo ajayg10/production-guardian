@@ -145,86 +145,70 @@ production-guardian/
 
 ### Prerequisites
 
-- Python 3.11+
-- Node.js 18+
-- PostgreSQL 15+ (or Docker)
-- Google AI Studio API key
-- Grafana Cloud account
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (recommended for simplest 1-command startup)
+- Or locally: Python 3.11+, Node.js 18+, and Docker for PostgreSQL
 
-### 1. Clone and Configure
+### Configuration
 
+Copy [.env.example](.env.example) to `.env` and provide your Google Gemini API key and Grafana Cloud credentials:
 ```bash
-git clone https://github.com/your-org/production-guardian
-cd production-guardian
 cp .env.example .env
-# Edit .env with your credentials
 ```
 
-### 2. Start PostgreSQL
+---
+
+### Method 1: Docker (Fastest & Recommended) 🐳
+
+Run the entire system (Database, FastAPI with built-in Grafana MCP, Telemetry Simulator, and Next.js Frontend) with a single command from the project root:
 
 ```bash
-docker-compose up postgres -d
+docker compose up -d
 ```
 
-### 3. Backend Setup
+That's it!
+- **Frontend Dashboard**: [http://localhost:3000](http://localhost:3000)
+- **API & Landing Page**: [http://localhost:8000](http://localhost:8000)
+- **API Swagger Docs**: [http://localhost:8000/api/docs](http://localhost:8000/api/docs)
+- **Grafana MCP Gateway**: [http://localhost:8000/mcp](http://localhost:8000/mcp)
 
+---
+
+### Method 2: Local Development Setup
+
+If you prefer running services directly on your host machine:
+
+#### 1. Start PostgreSQL
 ```bash
-cd apps/api
-python -m venv .venv
-.venv\Scripts\activate  # Windows
-pip install -r requirements.txt
+docker compose up postgres -d
 ```
 
-### 4. Run Migrations
-
+#### 2. Seed the Database
+The seed script automatically initializes tables and populates Scene 40–45 demo data:
 ```bash
-cd apps/api
-alembic upgrade head
+python database/seed/seed.py
 ```
 
-### 5. Seed Database
-
+#### 3. Start Backend & Built-in Grafana MCP
+The FastAPI backend serves the REST API and the built-in MCP server (`/mcp`) proxying to Grafana Cloud with zero external binaries needed:
 ```bash
-python ../../database/seed/seed.py
+python -m uvicorn apps.api.main:app --reload --port 8000
 ```
 
-### 6. Start Grafana MCP
-
+#### 4. Start Telemetry Simulator (in a second terminal)
+Pushes live telemetry to Grafana Cloud every 15 seconds:
 ```bash
-# Install mcp-grafana: https://github.com/grafana/mcp-grafana/releases
-mcp-grafana --transport http --port 8080 \
-  --grafana-url $GRAFANA_URL \
-  --grafana-token $GRAFANA_SERVICE_ACCOUNT_TOKEN
-```
-
-### 7. Start Backend
-
-```bash
-cd apps/api
-uvicorn main:app --reload --port 8000
-```
-
-### 8. Start Simulator
-
-```bash
-# In a new terminal
-cd production-guardian
 python simulator/service.py
 ```
 
-### 9. Start Frontend
-
+#### 5. Start Web Frontend (in a third terminal)
 ```bash
 cd apps/web
 npm install
 npm run dev
 ```
 
-### 10. Open Application
-
-```
-http://localhost:3000
-```
+#### 6. Open Application
+Navigate to [http://localhost:3000](http://localhost:3000).
 
 ---
 
