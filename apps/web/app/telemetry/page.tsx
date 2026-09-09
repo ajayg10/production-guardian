@@ -22,6 +22,17 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { getTelemetryStatus, simulateIncident, resetDemo, getGrafanaStatus } from "@/lib/api"
+import {
+  AreaChart,
+  Area,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts"
 
 export default function TelemetryPage() {
   const [mounted, setMounted] = useState(false)
@@ -31,6 +42,7 @@ export default function TelemetryPage() {
   const [simulating, setSimulating] = useState(false)
   const [resetting, setResetting] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
+  const [history, setHistory] = useState<any[]>([])
 
   const fetchData = async () => {
     try {
@@ -41,6 +53,21 @@ export default function TelemetryPage() {
       setStatus(telData)
       setGrafanaStatus(grafData)
       setLastUpdated(new Date())
+
+      if (telData?.metrics) {
+        const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+        setHistory((prev) => {
+          const point = {
+            time: timeStr,
+            storage: Number((telData.metrics.storage_utilization ?? 68).toFixed(1)),
+            throughput: Number((telData.metrics.ingest_throughput_gbps ?? 1.8).toFixed(2)),
+            writeLatency: Number((telData.metrics.disk_write_latency_ms ?? 40).toFixed(1)),
+            networkLatency: Number((telData.metrics.network_latency_ms ?? 2.4).toFixed(1)),
+            queueDepth: Math.round(telData.metrics.upload_queue_depth ?? 18),
+          }
+          return [...prev.slice(-14), point]
+        })
+      }
     } catch (err) {
       console.error(err)
     } finally {
@@ -426,6 +453,75 @@ export default function TelemetryPage() {
             </CardContent>
           </Card>
         </div>
+      </div>
+
+      {/* Real-time Time Series Telemetry Charts */}
+      <div className="grid gap-6 lg:grid-cols-2 pt-2">
+        {/* Storage & Write Latency Chart */}
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base font-semibold">Storage & Write Latency Trend</CardTitle>
+              <Badge variant="outline" className="text-xs">Live 15s Rolling</Badge>
+            </div>
+            <CardDescription>Correlates storage saturation with I/O queue write latency</CardDescription>
+          </CardHeader>
+          <CardContent className="h-64 pt-2">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={history.length > 0 ? history : [{ time: 'now', storage: storageVal, writeLatency: writeLatency }]}>
+                <defs>
+                  <linearGradient id="storageGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.4}/>
+                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.5} />
+                <XAxis dataKey="time" stroke="#64748b" fontSize={11} />
+                <YAxis yAxisId="left" stroke="#ef4444" fontSize={11} domain={[0, 100]} unit="%" />
+                <YAxis yAxisId="right" orientation="right" stroke="#38bdf8" fontSize={11} unit="ms" />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155", borderRadius: "8px" }}
+                  itemStyle={{ fontSize: "12px" }}
+                />
+                <Area yAxisId="left" type="monotone" dataKey="storage" name="Storage %" stroke="#ef4444" strokeWidth={2} fillOpacity={1} fill="url(#storageGrad)" />
+                <Line yAxisId="right" type="monotone" dataKey="writeLatency" name="Write Latency (ms)" stroke="#38bdf8" strokeWidth={2} dot={false} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* Throughput & Network Latency Chart */}
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base font-semibold">Ingest Throughput & Network</CardTitle>
+              <Badge variant="outline" className="text-xs">Real-Time Ingest</Badge>
+            </div>
+            <CardDescription>Offload throughput speed vs. network transport latency</CardDescription>
+          </CardHeader>
+          <CardContent className="h-64 pt-2">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={history.length > 0 ? history : [{ time: 'now', throughput: ingestThroughput, networkLatency: networkLatency }]}>
+                <defs>
+                  <linearGradient id="tpGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.4}/>
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.5} />
+                <XAxis dataKey="time" stroke="#64748b" fontSize={11} />
+                <YAxis yAxisId="left" stroke="#10b981" fontSize={11} domain={[0, 3]} unit=" GB/s" />
+                <YAxis yAxisId="right" orientation="right" stroke="#a855f7" fontSize={11} unit="ms" />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155", borderRadius: "8px" }}
+                  itemStyle={{ fontSize: "12px" }}
+                />
+                <Area yAxisId="left" type="monotone" dataKey="throughput" name="Ingest (GB/s)" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#tpGrad)" />
+                <Line yAxisId="right" type="monotone" dataKey="networkLatency" name="Net Latency (ms)" stroke="#a855f7" strokeWidth={2} dot={false} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Incident Simulator Scenarios */}
