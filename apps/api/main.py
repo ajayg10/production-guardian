@@ -222,6 +222,16 @@ def create_app() -> FastAPI:
     app.include_router(telemetry.router, prefix="/api", tags=["telemetry"])
     app.include_router(mcp.router, tags=["mcp"])
 
+    @app.get("/api/seed", tags=["seed"])
+    @app.post("/api/seed", tags=["seed"])
+    async def trigger_seed(count: int = 10):
+        """HTTP endpoint to seed/reset demo data with N realistic incidents."""
+        from core.database import AsyncSessionLocal
+        from database.seed.seed import seed
+        async with AsyncSessionLocal() as session:
+            await seed(session, count=count)
+        return {"status": "success", "message": f"Successfully seeded {count} incidents."}
+
     return app
 
 

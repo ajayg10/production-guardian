@@ -35,13 +35,29 @@ class Base(DeclarativeBase):
 
 
 async def init_db() -> None:
-    """Initialize database connection pool."""
+    """Initialize database connection pool, create tables, and auto-seed if empty."""
     try:
+        # Ensure models are registered on Base
+        import models.database  # noqa: F401
+
         async with engine.begin() as conn:
-            # Test connection
+            await conn.run_sync(Base.metadata.create_all)
             from sqlalchemy import text
             await conn.execute(text("SELECT 1"))
-        logger.info("database.connected", url=_mask_db_url(settings.database_url))
+        logger.info("database.connected_and_tables_verified", url=_mask_db_url(settings.database_url))
+
+        # Check if database has any production data; if not, seed automatically!
+        from sqlalchemy import select
+        async with AsyncSessionLocal() as session:
+            from models.database import Production
+            result = await session.execute(select(Production).limit(1))
+            prod = result.scalar_one_or_none()
+            if not prod:
+                logger.info("database.empty_auto_seeding")
+                from database.seed.seed import seed
+                await seed(session, count=10)
+                logger.info("database.auto_seeding_complete")
+
     except Exception as e:
         logger.error("database.connection_failed", error=str(e))
         raise
