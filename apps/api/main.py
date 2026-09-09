@@ -129,10 +129,19 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # CORS — allow frontend in development
+    # CORS — allow frontend in local, Vercel, and custom domains
+    allowed_origins = [
+        "https://production-guardian.vercel.app",
+        "http://localhost:3000",
+        "http://localhost:3001",
+    ]
+    if settings.frontend_url and settings.frontend_url not in allowed_origins:
+        allowed_origins.append(settings.frontend_url.rstrip("/"))
+
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[settings.frontend_url, "http://localhost:3000", "http://localhost:3001"],
+        allow_origins=allowed_origins,
+        allow_origin_regex=r"https://.*\.vercel\.app",
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
