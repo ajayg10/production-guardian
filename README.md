@@ -173,30 +173,7 @@ That's it!
 
 ---
 
-### Method 2: Azure Cloud Deployment (1-Click Automated) ☁️
-
-Deploy the complete stack to a Microsoft Azure Virtual Machine running Ubuntu, Docker, and the seeded PostgreSQL database with a single script:
-
-```powershell
-# 1. Run the automated deployment script
-.\deploy_azure_vm.ps1 -Location "eastus" -VmSize "Standard_B2s"
-```
-
-The script will:
-1. Log into your Azure subscription (via browser if needed).
-2. Create Resource Group `production-guardian-rg` and an Ubuntu VM.
-3. Automatically configure firewall/NSG ports `3000` (Web) and `8000` (API).
-4. Install Docker, clone the repo, start all 4 services via Docker Compose, and seed the database.
-5. Provide your live public Azure URLs (`http://<PUBLIC_IP>:3000`).
-
-To tear down and stop Azure billing at any time:
-```powershell
-.\deploy_azure_cleanup.ps1
-```
-
----
-
-### Method 3: Local Development Setup
+### Method 2: Local Development Setup
 
 If you prefer running services directly on your host machine:
 
